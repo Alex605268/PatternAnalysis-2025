@@ -38,51 +38,18 @@ class OASISDataset(Dataset):
 
         return image, label
 
-    #Functions copied from Assignment - will be used if switch from easy to normal task
-    #Unnecessary for OASIS dataset as it is already in PNG format
-    def to_channels(arr: np.ndarray, dtype=np.uint8) -> np.ndarray:
-        channels = np.unique(arr)
-        res = np.zeros(arr.shape + (len(channels),),dtype=dtype)
-        for c in channels:
-            c = int(c)
-            res[..., c:c+1][arr == c] = 1
+# Helper function that is called by train.py to get all 3 dataloaders
+def get_dataloaders(root_dir="/home/groups/comp3710/OASIS", batch_size=4):
+    # define the 3 datasets
+    train_dataset = OASISDataset(root_dir=root_dir, split="train")
+    val_dataset = OASISDataset(root_dir=root_dir, split="validate")
+    test_dataset = OASISDataset(root_dir=root_dir, split="test")
+    
+    #Construct the 3 dataloaders
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-        return res
+    #Return the 3 dataloaders
+    return train_loader, val_loader, test_loader
 
-    def load_data_2D(imageNames, normImage=False, categorical=False, 
-            dtype=np.float32, getAffines=False, early_stop=False):
-        affines = []
-
-        num = len(imageNames)
-        first_case = nib.load(imageNames[0]).get_fdata(caching='unchanged')
-        if len(first_case.shape) == 3:
-            first_case = first_case[:,:,0] #remove extra dimension
-        if categorical:
-            first_case = to_channels(first_case, dtype=dtype)
-            rows, cols, channels = first_case.shape
-            images = np.zeros((num, rows, cols, channels), dtype=dtype)
-        else:
-            rows, cols = first_case.shape
-            images = np.zeros((num, rows, cols), dtype=dtype)
-
-        for i, inName in enumerate(tqdm(imageNames)):
-            niftiImage = nib.load(inName)
-            inImage = niftiImage.get_fdata(caching='unchanged')
-            affine = niftiImage.affine
-            if len(inImage.shape) == 3:
-            inImage = inImage[:,:,0]
-            inImage = inImage.astype(dtype)
-            if normImage:
-                inImage = (inImage - inImage.mean()) / inImage.std()
-            if categorical:
-                inImage = utils.to_channels(inImage, dtype=dtype)
-                images[i,:,:,:] = inImage
-            else:
-                images[i,:,:] = inIMage
-            affines.append(affine)
-            if i > 20 and early_stop:
-                break
-        if getAffines:
-            return images, affines
-        else:
-            return images
