@@ -17,16 +17,28 @@ class DiceLoss(nn.Module):
         self.smooth = smooth
 
     def forward(self, preds, targets):
+        #preds = predictions, in form [BatchSize, Classes, Height, Width] = [B, C, H, W]
+        #targets are in form [B, H, W]
+
         #torch.softmax turns the UNet output scores into probabilities, which sum to 1
         preds = torch.softmax(preds, dim=1)
-        #flatten the predictions and labels into 1D tensors
-        preds_flat = preds.contiguous().view(-1)
-        targets_flat = targets.contiguous().view(-1)
-        #find the intersection between predicted probabilities and true values
-        intersection = (preds_flat * targets_flat).sum()
-        #Calculate the Dice Coefficient and subtract it from 1 to find the Dice Loss
-        return 1 - ((2. * intersection + self.smooth) /
-                    (preds_flat.sum() + targets_flat.sum() + self.smooth))
+
+        #Convert targets to one-hot encoding. This ensures that when we flatten it into
+        # a 1D tensor, it's the same size as the predictions tensor, so we can calculate
+        #the intersection.
+        targets_onehot = torch.nn.functional.one_hot(targets, num_classes=preds.shape[1])
+        # This line swaps the order around, so it matches preds order (which is the just
+        # the raw output of UNet, which gives [BatchSize, NumClasses, ImageHeight, ImageWidth]
+        targets_onehot = targets_onehot.permute(0, 3, 1, 2).float()  
+
+        #Calculate the Dice score for each class
+        intersection = (preds * targets_onehot).sum(dim=(2, 3))
+        union = preds.sum(dim=(2, 3)) + targets_onehot.sum(dim=(2,3))
+        dice_score = (2.0 * intersection + self.smooth) / (union + self.smooth)
+
+        #Subtract the mean dice score across all classes from 1 to find the average DiceLoss
+        loss = 1 - dice_score.mean()
+        return loss
 
 def dice_coefficient(preds, targets, smooth=1e-6):
     preds = torch.softmax(preds, dim=1)
@@ -34,7 +46,8 @@ def dice_coefficient(preds, targets, smooth=1e-6):
     intersection = (preds * targets).sum()
     return (2. * intersection + smooth) / (preds.sum() + targets.sum() + smooth)
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+device = torch.device("cpu")
 
 # Set the training paremeters
 num_epochs = 1
@@ -47,13 +60,14 @@ train_load, val_load, test_load = get_dataloaders(batch_size=batch_size)
 
 # Define the model, loss (DiceLoss) and optimiser (Adam)
 
-model = UNet(in_channels=1, out_channels=3).to(device)
+model = UNet(in_channels=1, out_channels=4).to(device)
 criterion = DiceLoss()
 optimiser = optim.Adam(model.parameters(), lr=learning_rate)
 
 
 best_val_dice = 50
-os.makedirs(checkpoint_dir, exist_ok=True)
+# Don't need below currently, only saving best model. May be used if I want all models.
+#os.makedirs(checkpoint_dir, exist_ok=True)
 
 # Training loop
 for epoch in range(num_epochs):
@@ -88,7 +102,7 @@ for epoch in range(num_epochs):
 
     # Save the best model found so far
     if val_dice > best_val_dice:
-        torch.save(model.state_dict, save_path)
+        torch.save(model.state_dict(), save_path)
         best_val_dice = val_dice
 
 

@@ -3,15 +3,13 @@
 
 import os
 import torch
-import torch.utils.data import Dataset, Dataloader
-import nibabel as nib
+from torch.utils.data import Dataset, DataLoader
 import numpy as np
 from PIL import Image
-from tqdm import tqdm
-from glob import glob
+import glob
 
 class OASISDataset(Dataset):
-    def __init__(self, root_dir="/home/groups/comp3710/OASIS", split="train", categorical=false):
+    def __init__(self, root_dir="/home/groups/comp3710/OASIS", split="train", categorical=False, transform=None):
         
         image_dir = os.path.join(root_dir, f"keras_png_slices_{split}")
         label_dir = os.path.join(root_dir, f"keras_png_slices_seg_{split}")
@@ -29,10 +27,22 @@ class OASISDataset(Dataset):
         image = Image.open(self.image_paths[idx]).convert("L")  
         label = Image.open(self.label_paths[idx]).convert("L")  
 
-        # Convert to tensors
-        image = torch.tensor(np.array(image), dtype=torch.float32).unsqueeze(0) / 255.0
-        label = torch.tensor(np.array(label), dtype=torch.long)
+        # Convert to np arrays
+        image_np = np.array(image)
+        label_np = np.array(label, dtype=np.uint8)
+        
 
+
+        # Convert to tensors
+        image = torch.tensor(image_np, dtype=torch.float32).unsqueeze(0) / 255.0
+        label = torch.tensor(label_np, dtype=torch.long)
+
+        #remap labels from [0, 85, 170, 255] to [0, 1, 2, 3], so that one-hot encoding of
+        #targets (in the diceloss function) works correctly. We do this by just dividing every label
+        #by 85, and rounding down.
+        label = torch.div(label, 85, rounding_mode=floor)
+
+        #optional transformation step - only used if transform is set in __init__
         if self.transform:
             image = self.transform(image)
 
