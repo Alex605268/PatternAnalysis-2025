@@ -40,7 +40,7 @@ class OASISDataset(Dataset):
         #remap labels from [0, 85, 170, 255] to [0, 1, 2, 3], so that one-hot encoding of
         #targets (in the diceloss function) works correctly. We do this by just dividing every label
         #by 85, and rounding down.
-        label = torch.div(label, 85, rounding_mode=floor)
+        label = torch.div(label, 85, rounding_mode='floor')
 
         #optional transformation step - only used if transform is set in __init__
         if self.transform:

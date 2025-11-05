@@ -4,9 +4,13 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import os
+import sys
+
 
 from modules import UNet
 from dataset import get_dataloaders
+
+sys.stdout.reconfigure(line_buffering=True)
 
 #Create the DiceLoss functionality
 class DiceLoss(nn.Module):
@@ -46,12 +50,12 @@ def dice_coefficient(preds, targets, smooth=1e-6):
     intersection = (preds * targets).sum()
     return (2. * intersection + smooth) / (preds.sum() + targets.sum() + smooth)
 
-#device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-device = torch.device("cpu")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+#device = torch.device("cpu")
 
 # Set the training paremeters
-num_epochs = 1
-batch_size = 4
+num_epochs = 10
+batch_size = 6
 learning_rate = 1e-4
 save_path = "best.pth"
 
@@ -65,7 +69,7 @@ criterion = DiceLoss()
 optimiser = optim.Adam(model.parameters(), lr=learning_rate)
 
 
-best_val_dice = 50
+best_val_dice = 0.0
 # Don't need below currently, only saving best model. May be used if I want all models.
 #os.makedirs(checkpoint_dir, exist_ok=True)
 
@@ -74,7 +78,7 @@ for epoch in range(num_epochs):
     model.train()
     running_loss = 0.0
 
-    for images, labels in train_load:
+    for i, (images, labels) in enumerate(train_load):
         images = images.to(device)
         labels = labels.to(device)
 
@@ -85,8 +89,11 @@ for epoch in range(num_epochs):
         optimiser.step()
 
         running_loss += loss.item()
+        if i % 5 == 0:
+            print(f"Epoch {epoch+1}, Batch {i}, Loss: {loss.item():.4f}")
 
     avg_loss = running_loss / len(train_load)
+    print(f"Epoch {epoch+1} finished, Avg Loss: {avg_loss:.4f}")
 
     #Validation Step
     model.eval()
@@ -118,4 +125,4 @@ with torch.no_grad():
         outputs = model(images)
         test_dice += dice_coefficient(outputs, labels)
     test_dice /= len(test_load)
-
+print(f"Final Dice Coefficient: {test_dice:.4f}")
