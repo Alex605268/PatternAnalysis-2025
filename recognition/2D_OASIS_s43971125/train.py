@@ -44,11 +44,17 @@ class DiceLoss(nn.Module):
         loss = 1 - dice_score.mean()
         return loss
 
+#Same as above, but this is used during the evaluation step, while the DiceLoss is used for training
 def dice_coefficient(preds, targets, smooth=1e-6):
     preds = torch.softmax(preds, dim=1)
-    preds = torch.argmax(preds, dim=1)
-    intersection = (preds * targets).sum()
-    return (2. * intersection + smooth) / (preds.sum() + targets.sum() + smooth)
+    num_classes = preds.shape[1]
+    targets_onehot = torch.nn.functional.one_hot(targets, num_classes=num_classes)
+    targets_onehot = targets_onehot.permute(0, 3, 1, 2).float()  
+
+    intersection = (preds * targets_onehot).sum(dim=(2, 3))
+    union = preds.sum(dim=(2, 3)) + targets_onehot.sum(dim=(2, 3))
+    dice_score = (2.0 * intersection + smooth) / (union + smooth)
+    return dice.mean()
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #device = torch.device("cpu")
@@ -78,7 +84,7 @@ for epoch in range(num_epochs):
     model.train()
     running_loss = 0.0
 
-    for i, (images, labels) in enumerate(train_load):
+    for images, labels in train_load:
         images = images.to(device)
         labels = labels.to(device)
 
@@ -89,8 +95,6 @@ for epoch in range(num_epochs):
         optimiser.step()
 
         running_loss += loss.item()
-        if i % 5 == 0:
-            print(f"Epoch {epoch+1}, Batch {i}, Loss: {loss.item():.4f}")
 
     avg_loss = running_loss / len(train_load)
     print(f"Epoch {epoch+1} finished, Avg Loss: {avg_loss:.4f}")
