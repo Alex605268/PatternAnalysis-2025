@@ -67,8 +67,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #device = torch.device("cpu")
 
 # Set the training paremeters
-num_epochs = 10
-batch_size = 4 
+num_epochs = 15
+batch_size = 8 
 learning_rate = 1e-4
 save_path = "best.pth"
 
@@ -140,20 +140,21 @@ for epoch in range(num_epochs):
         best_per_class = mean_dice.cpu().numpy()
         print(f"✅ New best model saved (Avg Dice: {mean_val_dice:.4f}, per class: {best_per_class})")
 
-
+    #blank line to separate each epoch
+    print()
 
 # Final test evaluation to find Dice Coefficient
 
 model.load_state_dict(torch.load(save_path))
 model.eval()
-dice_totals = torch.zeros(4)
+dice_totals = torch.zeros(4, device=device)
 with torch.no_grad():
     for images, labels in test_load:
         images = images.to(device)
         labels = labels.to(device)
         outputs = model(images)
         dice_scores = dice_coefficient(outputs, labels, num_classes=4)
-        dice_totals += torch.tensor(dice_scores, device=device)
+        dice_totals += dice_scores.to(device)
 dice_averages = dice_totals / len(test_load)
 
 for i, dice in enumerate(dice_averages):
