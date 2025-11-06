@@ -8,6 +8,7 @@ import numpy as np
 from PIL import Image
 import glob
 
+
 class OASISDataset(Dataset):
     def __init__(self, root_dir="/home/groups/comp3710/OASIS", split="train", categorical=False, transform=None):
         

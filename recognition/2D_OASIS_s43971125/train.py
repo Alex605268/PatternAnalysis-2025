@@ -45,23 +45,30 @@ class DiceLoss(nn.Module):
         return loss
 
 #Same as above, but this is used during the evaluation step, while the DiceLoss is used for training
-def dice_coefficient(preds, targets, smooth=1e-6):
+#Calculates dice_coefficient per class
+def dice_coefficient(preds, targets, num_classes=4, smooth=1e-6):
     preds = torch.softmax(preds, dim=1)
-    num_classes = preds.shape[1]
-    targets_onehot = torch.nn.functional.one_hot(targets, num_classes=num_classes)
-    targets_onehot = targets_onehot.permute(0, 3, 1, 2).float()  
+    preds = torch.argmax(preds, dim=1)
 
-    intersection = (preds * targets_onehot).sum(dim=(2, 3))
-    union = preds.sum(dim=(2, 3)) + targets_onehot.sum(dim=(2, 3))
-    dice_score = (2.0 * intersection + smooth) / (union + smooth)
-    return dice.mean()
+    dice_scores = []
+    for i in range(num_classes):
+        pred_i = (preds == i).float()
+        target_i = (targets == i).float()
+
+        intersection = (pred_i * target_i).sum()
+        union = pred_i.sum() + target_i.sum()
+
+        dice = (2.0 * intersection + smooth) / (union + smooth)
+        dice_scores.append(dice.item())
+
+    return torch.tensor(dice_scores, device=preds.device)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 #device = torch.device("cpu")
 
 # Set the training paremeters
 num_epochs = 10
-batch_size = 6
+batch_size = 4 
 learning_rate = 1e-4
 save_path = "best.pth"
 
@@ -101,32 +108,53 @@ for epoch in range(num_epochs):
 
     #Validation Step
     model.eval()
-    val_dice = 0.0
+    dice_scores = []
     with torch.no_grad():
         for images, labels in val_load:
             images = images.to(device)
             labels = labels.to(device)
             outputs = model(images)
-            val_dice += dice_coefficient(outputs, labels)
+            dice_batch = dice_coefficient(outputs, labels, num_classes=4)
+            dice_scores.append(dice_batch)
 
-    val_dice /= len(val_load)
+    dice_scores = torch.stack(dice_scores)
+    mean_dice = dice_scores.mean(dim=0)
+    
+    # Compute overall mean Dice score
+    mean_val_dice = mean_dice.mean().item()
 
-    # Save the best model found so far
-    if val_dice > best_val_dice:
+    # Print per-class results and average results
+    print(f"Validation Dice per class: {mean_dice.cpu().numpy()}")
+    print(f"Mean Validation Dice: {mean_val_dice:.4f}")
+
+    # Mean probability for each class
+    probs = torch.softmax(outputs, dim=1)
+    mean_probs = probs.mean(dim=(0, 2, 3))
+    print(f"Mean predicted probabilities per class: {mean_probs.cpu().numpy()}")
+
+
+    # Save the best model so far, based on the average Dice score
+    if mean_val_dice > best_val_dice:
         torch.save(model.state_dict(), save_path)
-        best_val_dice = val_dice
+        best_val_dice = mean_val_dice
+        best_per_class = mean_dice.cpu().numpy()
+        print(f"✅ New best model saved (Avg Dice: {mean_val_dice:.4f}, per class: {best_per_class})")
+
 
 
 # Final test evaluation to find Dice Coefficient
 
 model.load_state_dict(torch.load(save_path))
 model.eval()
-test_dice = 0.0
+dice_totals = torch.zeros(4)
 with torch.no_grad():
     for images, labels in test_load:
         images = images.to(device)
         labels = labels.to(device)
         outputs = model(images)
-        test_dice += dice_coefficient(outputs, labels)
-    test_dice /= len(test_load)
-print(f"Final Dice Coefficient: {test_dice:.4f}")
+        dice_scores = dice_coefficient(outputs, labels, num_classes=4)
+        dice_totals += torch.tensor(dice_scores, device=device)
+dice_averages = dice_totals / len(test_load)
+
+for i, dice in enumerate(dice_averages):
+    print(f"Class {i} Dice: {dice:.4f}")
