@@ -6,11 +6,9 @@ import torch.optim as optim
 import os
 import sys
 
-
 from modules import UNet
+from modules import ImprovedUNet
 from dataset import get_dataloaders
-
-sys.stdout.reconfigure(line_buffering=True)
 
 #Create the DiceLoss functionality
 class DiceLoss(nn.Module):
@@ -63,99 +61,101 @@ def dice_coefficient(preds, targets, num_classes=4, smooth=1e-6):
 
     return torch.tensor(dice_scores, device=preds.device)
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-#device = torch.device("cpu")
+#Note: wrap the training loop so it's only run when train.py is called, not when it's imported
+if __name__ == "__main__":
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    #device = torch.device("cpu")
 
-# Set the training paremeters
-num_epochs = 15
-batch_size = 8 
-learning_rate = 1e-4
-save_path = "best.pth"
+    # Set the training paremeters
+    num_epochs = 5
+    batch_size = 4 
+    learning_rate = 1e-4
+    save_path = "best.pth"
 
-# Load in the datasets
-train_load, val_load, test_load = get_dataloaders(batch_size=batch_size)
+    # Load in the datasets
+    train_load, val_load, test_load = get_dataloaders(batch_size=batch_size)
 
-# Define the model, loss (DiceLoss) and optimiser (Adam)
+    # Define the model, loss (DiceLoss) and optimiser (Adam)
 
-model = UNet(in_channels=1, out_channels=4).to(device)
-criterion = DiceLoss()
-optimiser = optim.Adam(model.parameters(), lr=learning_rate)
+    model = ImprovedUNet(in_channels=1, out_channels=4).to(device)
+    criterion = DiceLoss()
+    optimiser = optim.Adam(model.parameters(), lr=learning_rate)
 
 
-best_val_dice = 0.0
+    best_val_dice = 0.0
 # Don't need below currently, only saving best model. May be used if I want all models.
 #os.makedirs(checkpoint_dir, exist_ok=True)
 
-# Training loop
-for epoch in range(num_epochs):
-    model.train()
-    running_loss = 0.0
+    # Training loop
+    for epoch in range(num_epochs):
+        model.train()
+        running_loss = 0.0
 
-    for images, labels in train_load:
-        images = images.to(device)
-        labels = labels.to(device)
+        for images, labels in train_load:
+            images = images.to(device)
+            labels = labels.to(device)
 
-        optimiser.zero_grad()
-        outputs = model(images)
-        loss = criterion(outputs, labels)
-        loss.backward()
-        optimiser.step()
+            optimiser.zero_grad()
+            outputs = model(images)
+            loss = criterion(outputs, labels)
+            loss.backward()
+            optimiser.step()
 
-        running_loss += loss.item()
+            running_loss += loss.item()
 
-    avg_loss = running_loss / len(train_load)
-    print(f"Epoch {epoch+1} finished, Avg Loss: {avg_loss:.4f}")
+        avg_loss = running_loss / len(train_load)
+        print(f"Epoch {epoch+1} finished, Avg Loss: {avg_loss:.4f}")
 
-    #Validation Step
+        #Validation Step
+        model.eval()
+        dice_scores = []
+        with torch.no_grad():
+            for images, labels in val_load:
+                images = images.to(device)
+                labels = labels.to(device)
+                outputs = model(images)
+                dice_batch = dice_coefficient(outputs, labels, num_classes=4)
+                dice_scores.append(dice_batch)
+
+        dice_scores = torch.stack(dice_scores)
+        mean_dice = dice_scores.mean(dim=0)
+    
+        # Compute overall mean Dice score
+        mean_val_dice = mean_dice.mean().item()
+
+        # Print per-class results and average results
+        print(f"Validation Dice per class: {mean_dice.cpu().numpy()}")
+        print(f"Mean Validation Dice: {mean_val_dice:.4f}")
+
+        # Mean probability for each class
+        probs = torch.softmax(outputs, dim=1)
+        mean_probs = probs.mean(dim=(0, 2, 3))
+        print(f"Mean predicted probabilities per class: {mean_probs.cpu().numpy()}")
+
+
+        # Save the best model so far, based on the average Dice score
+        if mean_val_dice > best_val_dice:
+            torch.save(model.state_dict(), save_path)
+            best_val_dice = mean_val_dice
+            best_per_class = mean_dice.cpu().numpy()
+            print(f"✅ New best model saved (Avg Dice: {mean_val_dice:.4f}, per class: {best_per_class})")
+
+        #blank line to separate each epoch
+        print()
+
+    # Final test evaluation to find Dice Coefficient
+
+    model.load_state_dict(torch.load(save_path))
     model.eval()
-    dice_scores = []
+    dice_totals = torch.zeros(4, device=device)
     with torch.no_grad():
-        for images, labels in val_load:
+        for images, labels in test_load:
             images = images.to(device)
             labels = labels.to(device)
             outputs = model(images)
-            dice_batch = dice_coefficient(outputs, labels, num_classes=4)
-            dice_scores.append(dice_batch)
+            dice_scores = dice_coefficient(outputs, labels, num_classes=4)
+            dice_totals += dice_scores.to(device)
+    dice_averages = dice_totals / len(test_load)
 
-    dice_scores = torch.stack(dice_scores)
-    mean_dice = dice_scores.mean(dim=0)
-    
-    # Compute overall mean Dice score
-    mean_val_dice = mean_dice.mean().item()
-
-    # Print per-class results and average results
-    print(f"Validation Dice per class: {mean_dice.cpu().numpy()}")
-    print(f"Mean Validation Dice: {mean_val_dice:.4f}")
-
-    # Mean probability for each class
-    probs = torch.softmax(outputs, dim=1)
-    mean_probs = probs.mean(dim=(0, 2, 3))
-    print(f"Mean predicted probabilities per class: {mean_probs.cpu().numpy()}")
-
-
-    # Save the best model so far, based on the average Dice score
-    if mean_val_dice > best_val_dice:
-        torch.save(model.state_dict(), save_path)
-        best_val_dice = mean_val_dice
-        best_per_class = mean_dice.cpu().numpy()
-        print(f"✅ New best model saved (Avg Dice: {mean_val_dice:.4f}, per class: {best_per_class})")
-
-    #blank line to separate each epoch
-    print()
-
-# Final test evaluation to find Dice Coefficient
-
-model.load_state_dict(torch.load(save_path))
-model.eval()
-dice_totals = torch.zeros(4, device=device)
-with torch.no_grad():
-    for images, labels in test_load:
-        images = images.to(device)
-        labels = labels.to(device)
-        outputs = model(images)
-        dice_scores = dice_coefficient(outputs, labels, num_classes=4)
-        dice_totals += dice_scores.to(device)
-dice_averages = dice_totals / len(test_load)
-
-for i, dice in enumerate(dice_averages):
-    print(f"Class {i} Dice: {dice:.4f}")
+    for i, dice in enumerate(dice_averages):
+        print(f"Class {i} Dice: {dice:.4f}")

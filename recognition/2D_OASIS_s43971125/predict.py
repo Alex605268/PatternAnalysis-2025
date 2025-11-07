@@ -34,16 +34,20 @@ dice_scores = dice_coefficient(output, label, num_classes=4)
 print("Dice per Class:", dice_scores)
 
 #Visualise results
-import matplotlib.pyplot as plt
 plt.figure(figsize=(12,4))
+
 plt.subplot(1,3,1)
 plt.title("Input")
 plt.imshow(image[0,0].cpu(), cmap='gray')
+
 plt.subplot(1,3,2)
 plt.title("Ground Truth")
-plt.imshow(label.cpu(), cmap='jet')
+plt.imshow(label.squeeze().cpu(), cmap='jet')
+
 plt.subplot(1,3,3)
 plt.title("Prediction")
 plt.imshow(predicted[0].cpu(), cmap='jet')
-plt.show()
 
+plt.tight_layout()
+plt.savefig("prediction_example.png", dpi=300, bbox_inches='tight')
+print("Saved visualisation")
