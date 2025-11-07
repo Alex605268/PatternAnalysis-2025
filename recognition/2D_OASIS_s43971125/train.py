@@ -7,6 +7,7 @@ import os
 import sys
 
 from modules import UNet
+from modules import ImprovedUNet
 from dataset import get_dataloaders
 
 #Create the DiceLoss functionality, as explained in the lectures
