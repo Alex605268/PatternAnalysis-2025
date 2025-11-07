@@ -64,12 +64,12 @@ def predict_and_visualise(model, dataset_split="test", sample_index=0, save_path
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
-    print(f"Saved prediction visualisation to {save_path}")
+    #Note: return dice scores so that we can plot them using a different function
+    return dice_scores
 
 def predict_and_visualise_per_class(model, dataset_split="test", sample_index=0, save_path="prediction_per_class.png", num_classes=4, device=None):
     """
-    Runs inference on one sample from the dataset and visualises input, ground truth,
-    final predicted segmentation, and per-class probability maps.
+    Runs inference on one sample from the dataset and visualises per-class probability maps.
     """
     if device is None:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -106,14 +106,31 @@ def predict_and_visualise_per_class(model, dataset_split="test", sample_index=0,
     plt.tight_layout()
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
-    print(f"Saved visualisation to {save_path}")
 
+
+def plot_dice_scores(dice_scores, save_path="dice_scores.png"):
+    """
+    Plots a bar chart of Dice scores for each class.
+    """
+    classes = [f"Class {i}" for i in range(len(dice_scores))]
+    plt.figure(figsize=(6, 4))
+    plt.bar(classes, dice_scores, color="skyblue", edgecolor="black")
+    plt.ylim(0, 1.05)
+    plt.ylabel("Dice Score")
+    plt.title("Dice Score per Class")
+    plt.grid(axis='y', linestyle='--', alpha=0.6)
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"Saved Dice score plot to {save_path}")
 
 if __name__ == "__main__":
     model, device = load_model()
-    predict_and_visualise(model, sample_index=5, save_path="prediction_example.png", device=device)
+    #Note: plot_dice_scores requires dice_scores as input
+    #for simplicity,we just return them when we are plotting the example input-output
+    dice_scores = predict_and_visualise(model, sample_index=5, save_path="prediction_example.png", device=device)
     predict_and_visualise_per_class(model, sample_index=5, save_path="prediction_per_class.png", device=device)
-
+    plot_dice_scores(dice_scores, save_path="dice_scores.png")
 
 
 
