@@ -41,7 +41,9 @@ class UpBlock(nn.Module):
         x = self.conv(x)
         return x
 
-
+'''
+Basic UNet - this code was adapted from the Lectures
+'''
 
 class UNet(nn.Module):
     def __init__(self, in_channels=1, out_channels=4, base_filters=64):
@@ -84,7 +86,10 @@ class UNet(nn.Module):
         out = self.final_conv(d1)
         return out
 
-#Pre-activation residual block
+
+#Below are all the requirements for the improved UNet
+
+
 class PreActResBlock(nn.Module):
     #dropout_prob is optional tuning metric, used to regularise the block (prevents overfitting) 
     def __init__(self, in_ch, out_ch, dropout_prob=0.0):
