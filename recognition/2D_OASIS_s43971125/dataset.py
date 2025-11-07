@@ -8,8 +8,25 @@ import numpy as np
 from PIL import Image
 import glob
 
-
+'''
+OASISDataset class.
+Loads the 2D_OASIS_dataset, converts the images and labels to pytorch tensors,
+Remaps the labels to one-hot encoding, so that they are compatible with the DiceLoss function
+Optionally transforms the image if 'transform' is set, then returns the images and labels
+'''
 class OASISDataset(Dataset):
+    '''Current setup assumes that 2D_OASIS dataset is located in the specified root_dir
+    with the images and labels already split into train, test, and validation directory
+    Also assumes that all labels and images are .png files
+    /Oasis-
+        -keras_png_slices_train
+        -keras_png_slices_test
+        -keras_png_slices_val
+        -keras_png_slices_seg_train
+        -keras_png_slices_seg_test
+        -keras-png_slices_seg_val
+    If there is a different location, need to adjust root_dir, image_dir and label_dir accordingly
+    '''
     def __init__(self, root_dir="/home/groups/comp3710/OASIS", split="train", categorical=False, transform=None):
         
         image_dir = os.path.join(root_dir, f"keras_png_slices_{split}")

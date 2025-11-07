@@ -7,13 +7,12 @@ import os
 import sys
 
 from modules import UNet
-from modules import ImprovedUNet
 from dataset import get_dataloaders
 
-#Create the DiceLoss functionality
+#Create the DiceLoss functionality, as explained in the lectures
 class DiceLoss(nn.Module):
     #Subclass behaves like other Pytorch Loss functions
-    #smooth is a small constant - used in the calculation step to avoid division by zero
+    #smooth is a small constant - used in the calculation step to avoid potential division by zero
     def __init__(self, smooth=1e-6):
         super(DiceLoss, self).__init__()
         self.smooth = smooth
@@ -49,6 +48,7 @@ def dice_coefficient(preds, targets, num_classes=4, smooth=1e-6):
     preds = torch.argmax(preds, dim=1)
 
     dice_scores = []
+    # for each class, compute the dice score, then add them to a tensor.
     for i in range(num_classes):
         pred_i = (preds == i).float()
         target_i = (targets == i).float()
@@ -58,7 +58,7 @@ def dice_coefficient(preds, targets, num_classes=4, smooth=1e-6):
 
         dice = (2.0 * intersection + smooth) / (union + smooth)
         dice_scores.append(dice.item())
-
+    #return the tensor that contains the dice score for each class
     return torch.tensor(dice_scores, device=preds.device)
 
 #Note: wrap the training loop so it's only run when train.py is called, not when it's imported
@@ -67,10 +67,10 @@ if __name__ == "__main__":
     #device = torch.device("cpu")
 
     # Set the training paremeters
-    num_epochs = 5
-    batch_size = 4 
+    num_epochs = 25 
+    batch_size = 4
     learning_rate = 1e-4
-    save_path = "best.pth"
+    save_path = "best_improved.pth"
 
     # Load in the datasets
     train_load, val_load, test_load = get_dataloaders(batch_size=batch_size)
@@ -82,11 +82,12 @@ if __name__ == "__main__":
     optimiser = optim.Adam(model.parameters(), lr=learning_rate)
 
 
+    # set the initial best dice score to 0. Gets updated each time the model
+    # finds a better score
     best_val_dice = 0.0
-# Don't need below currently, only saving best model. May be used if I want all models.
-#os.makedirs(checkpoint_dir, exist_ok=True)
 
     # Training loop
+    # Note all print statements have no impact on training, are optional to track progress
     for epoch in range(num_epochs):
         model.train()
         running_loss = 0.0
@@ -140,11 +141,10 @@ if __name__ == "__main__":
             best_per_class = mean_dice.cpu().numpy()
             print(f"✅ New best model saved (Avg Dice: {mean_val_dice:.4f}, per class: {best_per_class})")
 
-        #blank line to separate each epoch
+        #blank line to separate each epoch printout in the log
         print()
 
-    # Final test evaluation to find Dice Coefficient
-
+    # Final test evaluation to find Dice Coefficient for each class
     model.load_state_dict(torch.load(save_path))
     model.eval()
     dice_totals = torch.zeros(4, device=device)

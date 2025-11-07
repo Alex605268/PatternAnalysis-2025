@@ -243,6 +243,8 @@ class ImprovedUNet(nn.Module):
 
         # Sum elementwise to combine them. 
         # By doing this, gives stronger supervision to early layers
+        # also means we can swap out standard UNet and Improved UNet in train.py with no changes
+        # since they both return a single output this way
         combined = out_final + aux2_up + aux3_up + aux4_up
         return combined
 
