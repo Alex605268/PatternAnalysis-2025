@@ -43,7 +43,7 @@ better gradient flow (because it provides the gradient from all levels of the de
 stabilises faster which speeds it up) and improved accuracy (because we are taking outputs from all levels of the encoder,
 intermediate features are more prominent, which will lead to better final predictions
 
-![Improed UNet Architecture](documentation/Improved_UNet.png)
+![Improved UNet Architecture](documentation/Improved_UNet.png)
 
 # Loading Data
 [dataset.py](dataset.py)
@@ -72,12 +72,26 @@ for each weight and adjusting how much each weight is updated. It's a very commo
 such as UNet.
 
 # Testing
-
+The model was tested by measuring the Dice Scores for each class. Each Dice score is calculated independently to
+avoid imbalanced class errors. See results for an example of the input and output, the probability maps for
+each class, and the dice scores per class.
 
 # Result
+Dice scores per class
+Class 0: 0.9993
+Class 1: 0.9585
+Class 2: 0.9653
+Class 3: 0.9783
+![Dice Scores](documentation/dice_dcores.png)
+
+Example input-output
+![Visualisation](documentation/prediction_example.png)
+
+Example per-class visualisation
+![Per-class visualisation](documentation/prediction_per_class.png)
 
 # References
-Lecture Slides for PNGs
+Lecture Slides for model PNGs
 
 # Dependencies
 pytorch=2.6.0

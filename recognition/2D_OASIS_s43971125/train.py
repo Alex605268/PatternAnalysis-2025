@@ -68,7 +68,7 @@ if __name__ == "__main__":
     #device = torch.device("cpu")
 
     # Set the training paremeters
-    num_epochs = 25 
+    num_epochs = 50 
     batch_size = 4
     learning_rate = 1e-4
     save_path = "best_improved.pth"
@@ -106,7 +106,7 @@ if __name__ == "__main__":
             running_loss += loss.item()
 
         avg_loss = running_loss / len(train_load)
-        print(f"Epoch {epoch+1} finished, Avg Loss: {avg_loss:.4f}")
+        #print(f"Epoch {epoch+1} finished, Avg Loss: {avg_loss:.4f}")
 
         #Validation Step
         model.eval()
@@ -126,13 +126,13 @@ if __name__ == "__main__":
         mean_val_dice = mean_dice.mean().item()
 
         # Print per-class results and average results
-        print(f"Validation Dice per class: {mean_dice.cpu().numpy()}")
-        print(f"Mean Validation Dice: {mean_val_dice:.4f}")
+        #print(f"Validation Dice per class: {mean_dice.cpu().numpy()}")
+        #print(f"Mean Validation Dice: {mean_val_dice:.4f}")
 
         # Mean probability for each class
         probs = torch.softmax(outputs, dim=1)
         mean_probs = probs.mean(dim=(0, 2, 3))
-        print(f"Mean predicted probabilities per class: {mean_probs.cpu().numpy()}")
+        #print(f"Mean predicted probabilities per class: {mean_probs.cpu().numpy()}")
 
 
         # Save the best model so far, based on the average Dice score
@@ -140,10 +140,10 @@ if __name__ == "__main__":
             torch.save(model.state_dict(), save_path)
             best_val_dice = mean_val_dice
             best_per_class = mean_dice.cpu().numpy()
-            print(f"✅ New best model saved (Avg Dice: {mean_val_dice:.4f}, per class: {best_per_class})")
+            #print(f"✅ New best model saved (Avg Dice: {mean_val_dice:.4f}, per class: {best_per_class})")
 
         #blank line to separate each epoch printout in the log
-        print()
+        #print()
 
     # Final test evaluation to find Dice Coefficient for each class
     model.load_state_dict(torch.load(save_path))
@@ -158,5 +158,5 @@ if __name__ == "__main__":
             dice_totals += dice_scores.to(device)
     dice_averages = dice_totals / len(test_load)
 
-    for i, dice in enumerate(dice_averages):
-        print(f"Class {i} Dice: {dice:.4f}")
+    #for i, dice in enumerate(dice_averages):
+    #    print(f"Class {i} Dice: {dice:.4f}")

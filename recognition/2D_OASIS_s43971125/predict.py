@@ -88,10 +88,6 @@ def predict_and_visualise_per_class(model, dataset_split="test", sample_index=0,
         probs = torch.softmax(output, dim=1)  # [B, C, H, W]
         predicted = torch.argmax(output, dim=1)
 
-    # Compute Dice per class
-    dice_scores = dice_coefficient(output, label, num_classes=num_classes)
-    print(f"Dice per Class (sample {sample_index}):", dice_scores)
-
     # Visualise results
     n_cols = 3 + num_classes  # input + GT + overall prediction + per-class
     plt.figure(figsize=(4 * n_cols, 4))
@@ -112,9 +108,10 @@ def plot_dice_scores(dice_scores, save_path="dice_scores.png"):
     """
     Plots a bar chart of Dice scores for each class.
     """
-    classes = [f"Class {i}" for i in range(len(dice_scores))]
+    dice_scores_np = dice_scores.cpu().numpy()
+    classes = [f"Class {i}" for i in range(len(dice_scores_np))]
     plt.figure(figsize=(6, 4))
-    plt.bar(classes, dice_scores, color="skyblue", edgecolor="black")
+    plt.bar(classes, dice_scores_np, color="skyblue", edgecolor="black")
     plt.ylim(0, 1.05)
     plt.ylabel("Dice Score")
     plt.title("Dice Score per Class")
